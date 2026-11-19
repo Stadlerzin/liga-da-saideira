@@ -99,7 +99,7 @@ function standings(since = 0){
 /* ---------- Pessoas ---------- */
 function nameOf(id){ return S.users[id]?.nick || "Jogador"; }
 function colorOf(id){ let h=0; for (const ch of String(id)) h = (h*31 + ch.charCodeAt(0))>>>0; return COLORS[h % COLORS.length]; }
-function avatar(id){ return `<span class="avatar" style="background:${colorOf(id)}" aria-hidden="true">${esc(nameOf(id).trim().charAt(0).toUpperCase() || "?")}</span>`; }
+function avatar(id){ return `<span class="avatar" aria-hidden="true">${esc(nameOf(id).trim().charAt(0).toUpperCase() || "?")}</span>`; }
 
 /* ---------- Tempo ---------- */
 function ago(ts){
@@ -198,7 +198,7 @@ function viewTabela(){
     <thead><tr><th>#</th><th class="l">Jogador</th><th title="Pontos">P</th><th title="Vitórias: saídas">V</th><th title="Saldo: beijos menos tocos">SG</th></tr></thead><tbody>
     ${rows.map((r,i) => `<tr class="${zone(i)} ${r.id===S.me?"me":""}">
       <td class="pos">${i+1}</td>
-      <td class="l name">${avatar(r.id)}${esc(nameOf(r.id))}</td>
+      <td class="l name"><a class="plink" href="#${r.id===S.me?"perfil":"j-"+esc(r.id)}">${avatar(r.id)}${esc(nameOf(r.id))}</a></td>
       <td class="pts">${r.P}</td><td>${r.V}</td><td>${r.SG>0?"+":""}${r.SG}</td>
     </tr>`).join("")}
   </tbody></table></div>`;
@@ -213,7 +213,7 @@ function viewFeed(){
     const summary = [countText(c, DRINKS), countText(c, RESENHA), c.pt ? "PT" : ""].filter(Boolean).join(" · ");
     const src = photoSrc(c.photoId), live = own && Date.now()-c.ts < 14*3600000;
     return `<article class="post clean">
-      <div class="post-h">${avatar(c.uid)}<div class="who-w"><div class="who">${esc(nameOf(c.uid))}</div><div class="when">${esc(c.place || t.label)} · ${ago(c.ts)}</div></div><b class="score ${r.total<0?"neg":t.cls}">${r.total>=0?"+":""}${r.total}</b></div>
+      <div class="post-h"><a class="plink" href="#${own?"perfil":"j-"+esc(c.uid)}">${avatar(c.uid)}</a><div class="who-w"><a class="who plink" href="#${own?"perfil":"j-"+esc(c.uid)}">${esc(nameOf(c.uid))}</a><div class="when">${esc(c.place || t.label)} · ${ago(c.ts)}</div></div><b class="score ${r.total<0?"neg":t.cls}">${r.total>=0?"+":""}${r.total}</b></div>
       ${c.photoId?`<div class="photo">${src?`<img src="${src}" alt="Foto do rolê de ${esc(nameOf(c.uid))}">`:""}</div>`:""}
       ${summary?`<div class="drinklist">${esc(summary)}</div>`:""}
       ${c.note?`<p class="note">${esc(c.note)}</p>`:""}
@@ -274,35 +274,81 @@ function viewDesafios(){
   </div>`;
 }
 
-function viewPerfil(){
-  const u = S.users[S.me] || {};
-  const st = playerStats(S.me);
-  const pos = standings(0).findIndex(r => r.id === S.me) + 1;
-  const login = auth.currentUser?.email || "";
-  const shownLogin = login.endsWith("@" + PHONE_DOMAIN) ? "+" + login.split("@")[0] : login;
-  return `<div class="join"><input class="field" id="nick" maxlength="24" aria-label="Apelido na tabela" value="${esc(u.nick||"")}"><button class="btn primary" id="saveNick" type="button">Salvar</button></div><div id="nickMsg" class="msg" role="status"></div>
-  <div class="big">
-    <div><b>${pos?pos+"º":"–"}</b><small>posição</small></div>
-    <div><b class="t-open">${st.P}</b><small>pontos</small></div>
-    <div><b>${st.V}</b><small>saídas</small></div>
-    <div><b>${st.SG>0?"+":""}${st.SG}</b><small>saldo</small></div>
-  </div>
-  <details class="more"><summary>Como pontua</summary>
-    <ul class="rulelist">
+const ICON = {
+  grid: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>',
+  stats: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20V12M10 20V6M15 20V10M20 20V4"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  photo: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="15.5" cy="9.5" r="1.8"/><path d="m3.5 17 5.5-5.5 4.5 4.5 2.5-2.5 4.5 4.5"/></svg>',
+};
+function viewPerfil(uid){
+  uid = uid || S.me;
+  const mine = uid === S.me;
+  const u = S.users[uid] || {};
+  const st = playerStats(uid);
+  const pos = standings(0).findIndex(r => r.id === uid) + 1;
+  const cs = S.checkins.filter(c => c.uid === uid);
+  const tab = S.profTab || "fotos";
+  let body = "";
+  if (tab === "fotos"){
+    const withPhoto = cs.filter(c => c.photoId);
+    body = withPhoto.length ? `<div class="pgrid">${withPhoto.map(c => { const src = photoSrc(c.photoId); return `<button class="pcell" ${mine?`data-edit="${esc(c.id)}"`:`data-goto="feed"`} aria-label="${esc(c.place || TYPES[c.type]?.label || "Rolê")}">${src?`<img src="${src}" alt="">`:""}<span class="pbadge">${ciCalc(c).total}</span></button>`; }).join("")}</div>`
+      : `<div class="pempty">${ICON.photo}<b>Ainda sem fotos</b>${mine?`<a href="#checkin" class="btn">Postar primeiro rolê</a>`:""}</div>`;
+  } else if (tab === "stats"){
+    const line = (l, v) => `<li><span>${l}</span><b>${v}</b></li>`;
+    body = `<ul class="statlist">
+      ${line("Pontos", st.P)}${line("Posição", pos ? pos + "º" : "–")}${line("Bares", st.bar)}${line("Festas", st.festa)}
+      ${line("Cervejas", st.cerveja)}${line("Copos de destilado", st.destilado)}${line("Shots", st.shot)}
+      ${line("Beijos", st.beijos)}${line("Tocos", st.tocos)}${line("Transas", st.transa)}${line("PTs", st.pt)}
+    </ul>`;
+  } else {
+    const byDay = {};
+    for (const c of cs){ const k = new Date(c.ts).toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"}); (byDay[k] = byDay[k] || []).push(c); }
+    const days = Object.entries(byDay);
+    body = days.length ? `<ul class="statlist">${days.map(([d, l]) => `<li><span>${esc(d)}</span><b>${l.map(c => esc(c.place || TYPES[c.type]?.label)).join(", ")}</b></li>`).join("")}</ul>`
+      : `<div class="pempty">${ICON.cal}<b>Nenhum rolê ainda</b></div>`;
+  }
+  const panel = S.profPanel;
+  return `<section class="prof">
+    <div class="prof-top">
+      <div class="bigav" aria-hidden="true">${esc(nameOf(uid).trim().charAt(0).toUpperCase() || "?")}</div>
+      <div class="pstats">
+        <div><b>${st.P}</b><small>Pontos</small></div>
+        <div><b>${st.V}</b><small>Saídas</small></div>
+        <div><b>${st.doses}</b><small>Bebidas</small></div>
+        <div><b>${st.beijos}</b><small>Beijos</small></div>
+      </div>
+    </div>
+    <div class="pname">${esc(nameOf(uid))}${pos?`<span>${pos}º na liga</span>`:""}</div>
+    <div class="pbtns">
+      ${mine ? `<button class="btn" data-panel="edit" aria-expanded="${panel==="edit"}">Editar perfil</button>` : `<a class="btn" href="#tabela">Ver tabela</a>`}
+      <button class="btn" data-panel="rules" aria-expanded="${panel==="rules"}">Como pontua</button>
+    </div>
+    ${mine && panel === "edit" ? `<div class="ppanel"><label class="lbl" for="nick">Apelido</label><div class="join"><input class="field" id="nick" maxlength="24" value="${esc(u.nick||"")}"><button class="btn primary" id="saveNick" type="button">Salvar</button></div><div id="nickMsg" class="msg" role="status"></div>
+      <div class="acct"><span class="kc">${esc(loginLabel())}</span><button class="btn ghost" data-logout>Sair</button></div></div>` : ""}
+    ${panel === "rules" ? `<div class="ppanel"><ul class="rulelist">
       <li><span>Bar</span><b>5</b></li><li><span>Festa</span><b>10</b></li>
-      <li><span>Cerveja</span><b>1</b></li><li><span>Copo de destilado</span><b>2</b></li><li><span>Shot</span><b>3</b></li>
+      <li><span>Cerveja</span><b>1</b></li><li><span>Destilado</span><b>2</b></li><li><span>Shot</span><b>3</b></li>
       <li><span>Beijo</span><b>3</b></li><li><span>Toco</span><b>1</b></li><li><span>Transa</span><b>8</b></li><li><span>PT</span><b>−5</b></li>
-    </ul>
-    <p class="sub" style="margin:8px 0 0">Desempate: pontos, saídas (V), beijos menos tocos (SG).</p>
-  </details>
-  <div class="acct"><span class="kc">Conectado como ${esc(shownLogin)}</span><button class="btn ghost" data-logout>Sair</button></div>`;
+    </ul><p class="sub" style="margin:8px 0 0">Desempate: pontos, saídas (V), beijos menos tocos (SG).</p></div>` : ""}
+  </section>
+  <div class="ptabs" role="tablist">
+    <button role="tab" data-ptab="fotos" aria-selected="${tab==="fotos"}" aria-label="Fotos">${ICON.grid}</button>
+    <button role="tab" data-ptab="cal" aria-selected="${tab==="cal"}" aria-label="Calendário">${ICON.cal}</button>
+    <button role="tab" data-ptab="stats" aria-selected="${tab==="stats"}" aria-label="Estatísticas">${ICON.stats}</button>
+  </div>
+  ${body}`;
+}
+function loginLabel(){
+  const login = auth.currentUser?.email || "";
+  return "Conectado como " + (login.endsWith("@" + PHONE_DOMAIN) ? "+" + login.split("@")[0] : login);
 }
 
 /* ---------- Render ---------- */
 const VIEWS = { tabela: viewTabela, feed: viewFeed, checkin: viewCheckin, desafios: viewDesafios, perfil: viewPerfil };
 const TITLES = { tabela: "Tabela", feed: "Feed", checkin: "Postar", desafios: "Desafios", perfil: "Perfil" };
 let rendered = "";
-function route(){ const h = location.hash.slice(1); return VIEWS[h] ? h : "tabela"; }
+function route(){ const h = location.hash.slice(1); if (h.startsWith("j-")) return "jogador"; return VIEWS[h] ? h : "tabela"; }
+function routeUid(){ const h = location.hash.slice(1); return h.startsWith("j-") ? h.slice(2) : S.me; }
 function render(){
   const nav = $("nav.tabs");
   if (!configured){ nav.hidden = true; $("#pageTitle").textContent = "Quase lá"; $("#view").innerHTML = `<div class="empty"><b>Falta configurar</b>Cole as chaves do Firebase no arquivo config.js.</div>`; return; }
@@ -313,11 +359,12 @@ function render(){
   nav.hidden = false;
   const r = route();
   document.querySelectorAll("nav.tabs a").forEach(a => { if (a.getAttribute("href") === "#"+r) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
-  $("#pageTitle").textContent = r === "checkin" && S.draft.editId ? "Editar rolê" : TITLES[r];
+  const pu = r === "perfil" || r === "jogador" ? routeUid() : null;
+  $("#pageTitle").textContent = pu ? "@" + nameOf(pu).toLowerCase().replace(/\s+/g, "") : (r === "checkin" && S.draft.editId ? "Editar rolê" : TITLES[r]);
   $("#status").innerHTML = statusBanner();
   if (r === "checkin" && rendered === "checkin" && document.getElementById("ciForm")) { refreshPreview(); return; }
   if (r === "perfil" && rendered === "perfil" && document.activeElement?.id === "nick") return;
-  $("#view").innerHTML = VIEWS[r]();
+  $("#view").innerHTML = pu ? viewPerfil(pu) : VIEWS[r]();
   rendered = r;
 }
 function refreshPreview(){
@@ -325,7 +372,7 @@ function refreshPreview(){
   const t = $("#pvTotal"); if (t){ t.textContent = (prev.total>=0?"+":"") + prev.total; t.className = prev.total < 0 ? "neg" : TYPES[d.type].cls; }
   ALL.forEach(x => { const btn = document.querySelector(`[data-step="${x.k}"][data-d="1"]`); if (!btn) return; const box = btn.closest(".stp"); const q = num(d.n[x.k]); box.querySelector(".ctl b").textContent = q; box.classList.toggle("has", q>0); });
 }
-window.addEventListener("hashchange", () => { rendered = ""; render(); window.scrollTo(0,0); });
+window.addEventListener("hashchange", () => { rendered = ""; S.profPanel = ""; render(); window.scrollTo(0,0); });
 
 /* ---------- Dados ao vivo ---------- */
 function startData(){
@@ -355,6 +402,9 @@ document.addEventListener("click", async e => {
     if (!info || info.isPhone){ m.className = "msg err"; m.textContent = info?.isPhone ? "Quem entra pelo celular precisa pedir para o organizador redefinir a senha." : "Digite seu e-mail acima primeiro."; return; }
     try { await sendPasswordResetEmail(auth, info.email); m.className = "msg"; m.textContent = "Enviamos um link para o seu e-mail."; } catch(err){ m.className = "msg err"; m.textContent = authError(err); }
     return; }
+  const pt = e.target.closest("[data-ptab]"); if (pt){ S.profTab = pt.dataset.ptab; rendered = ""; render(); return; }
+  const pn = e.target.closest("[data-panel]"); if (pn){ S.profPanel = S.profPanel === pn.dataset.panel ? "" : pn.dataset.panel; rendered = ""; render(); return; }
+  const gt = e.target.closest("[data-goto]"); if (gt){ location.hash = "#" + gt.dataset.goto; return; }
   const st = e.target.closest("[data-step]");
   if (st){ const k = st.dataset.step; S.draft.n[k] = Math.max(0, num(S.draft.n[k]) + (+st.dataset.d)); refreshPreview(); return; }
   const tq = e.target.closest("[data-togglequick]");
