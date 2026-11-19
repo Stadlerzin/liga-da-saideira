@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  initializeAuth, indexedDBLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signOut, sendPasswordResetEmail, setPersistence, browserLocalPersistence, connectAuthEmulator,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
@@ -33,7 +33,7 @@ const PHONE_DOMAIN = "tel.ligadasaideira.app";
 /* ---------- Estado ---------- */
 const configured = firebaseConfig && firebaseConfig.apiKey && !String(firebaseConfig.apiKey).startsWith("COLE");
 const app = configured ? initializeApp(firebaseConfig) : null;
-const auth = app ? getAuth(app) : null;
+const auth = app ? initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] }) : null;
 const db = app ? getFirestore(app) : null;
 if (app && firebaseConfig.useEmulator){ connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true }); connectFirestoreEmulator(db, "127.0.0.1", 8080); }
 
@@ -158,35 +158,38 @@ function statusBanner(){
   return "";
 }
 
+function lastLogin(){ try { return localStorage.getItem("liga:login") || ""; } catch(e){ return ""; } }
+function rememberLogin(v){ try { localStorage.setItem("liga:login", v); } catch(e){} }
+const LOGO = `<img class="alogo" src="icon-192.png" alt="" width="84" height="84">`;
 function viewAuth(){
   const signup = S.authMode === "criar";
   return `<div class="authbox">
-    <p class="sub" style="margin-bottom:16px">${signup ? "Crie sua conta para entrar na liga." : "Entre para ver a tabela e postar seus rolês."}</p>
-    <div class="seg" role="group" aria-label="Entrar ou criar conta" style="width:100%;display:grid;grid-template-columns:1fr 1fr">
-      <button type="button" data-authmode="entrar" aria-pressed="${!signup}">Entrar</button>
-      <button type="button" data-authmode="criar" aria-pressed="${signup}">Criar conta</button>
-    </div>
-    <form id="authForm" class="ci" novalidate>
-      ${signup ? `<div><label class="lbl" for="aNick">Apelido na tabela</label><input class="field" id="aNick" maxlength="24" autocomplete="nickname" required></div>` : ""}
-      <div><label class="lbl" for="aLogin">E-mail ou celular</label><input class="field" id="aLogin" autocomplete="username" inputmode="email" placeholder="voce@email.com ou (11) 91234-5678" required></div>
-      <div><label class="lbl" for="aPass">Senha</label><input class="field" id="aPass" type="password" minlength="6" autocomplete="${signup ? "new-password" : "current-password"}" required></div>
-      ${signup ? `<div><label class="lbl" for="aCode">Código da liga</label><input class="field" id="aCode" autocomplete="off" autocapitalize="characters" placeholder="Peça para quem te convidou" required></div>` : ""}
+    <div class="ahead">${LOGO}<h2>Liga da Saideira</h2><p>${signup ? "Crie sua conta para entrar na liga." : "Entre para ver a tabela e postar seus rolês."}</p></div>
+    <form id="authForm" class="aform" novalidate>
+      ${signup ? `<input class="field" id="aNick" maxlength="24" autocomplete="nickname" placeholder="Apelido na tabela" aria-label="Apelido na tabela" required>` : ""}
+      <input class="field" id="aLogin" autocomplete="username" inputmode="email" autocapitalize="none" placeholder="E-mail ou celular" aria-label="E-mail ou celular" value="${signup ? "" : esc(lastLogin())}" required>
+      <input class="field" id="aPass" type="password" minlength="6" autocomplete="${signup ? "new-password" : "current-password"}" placeholder="Senha" aria-label="Senha" required>
+      ${signup ? `<input class="field" id="aCode" autocomplete="off" autocapitalize="characters" placeholder="Código da liga" aria-label="Código da liga" required>` : ""}
       <button class="btn primary" type="submit" id="authSubmit">${signup ? "Criar conta" : "Entrar"}</button>
       <div id="authMsg" class="msg" role="status"></div>
-      ${signup ? "" : `<button type="button" class="btn ghost" id="forgot" style="align-self:flex-start;padding-left:0">Esqueci a senha</button>`}
+      ${signup ? "" : `<button type="button" class="alink" id="forgot">Esqueci a senha</button>`}
     </form>
+    <div class="aswitch">${signup ? `Já tem conta? <button type="button" data-authmode="entrar">Entrar</button>` : `Não tem conta? <button type="button" data-authmode="criar">Criar conta</button>`}</div>
+    <p class="afoot">Você continua conectado neste aparelho até tocar em Sair.<br>Proibido para menores de 18 anos.</p>
   </div>`;
 }
 
 function viewJoin(){
-  return `<div class="authbox"><p class="sub">Falta só escolher seu apelido e colocar o código da liga.</p>
-    <form id="joinForm" class="ci" novalidate>
-      <div><label class="lbl" for="jNick">Apelido na tabela</label><input class="field" id="jNick" maxlength="24" required></div>
-      <div><label class="lbl" for="jCode">Código da liga</label><input class="field" id="jCode" autocapitalize="characters" required></div>
+  return `<div class="authbox">
+    <div class="ahead">${LOGO}<h2>Quase lá</h2><p>Escolha seu apelido e coloque o código da liga.</p></div>
+    <form id="joinForm" class="aform" novalidate>
+      <input class="field" id="jNick" maxlength="24" placeholder="Apelido na tabela" aria-label="Apelido na tabela" required>
+      <input class="field" id="jCode" autocapitalize="characters" placeholder="Código da liga" aria-label="Código da liga" required>
       <button class="btn primary" type="submit">Entrar na liga</button>
       <div id="joinMsg" class="msg ${S.joinErr?"err":""}" role="status">${esc(S.joinErr||"")}</div>
-      <button type="button" class="btn ghost" data-logout style="align-self:flex-start;padding-left:0">Sair</button>
-    </form></div>`;
+    </form>
+    <div class="aswitch"><button type="button" data-logout>Usar outra conta</button></div>
+  </div>`;
 }
 
 function viewTabela(){
@@ -351,8 +354,9 @@ function route(){ const h = location.hash.slice(1); if (h.startsWith("j-")) retu
 function routeUid(){ const h = location.hash.slice(1); return h.startsWith("j-") ? h.slice(2) : S.me; }
 function render(){
   const nav = $("nav.tabs");
+  document.body.classList.toggle("authmode", !S.me || S.member === false || !configured);
   if (!configured){ nav.hidden = true; $("#pageTitle").textContent = "Quase lá"; $("#view").innerHTML = `<div class="empty"><b>Falta configurar</b>Cole as chaves do Firebase no arquivo config.js.</div>`; return; }
-  if (!S.authReady){ nav.hidden = true; $("#pageTitle").textContent = ""; $("#view").innerHTML = `<div class="banner">Carregando…</div>`; return; }
+  if (!S.authReady){ nav.hidden = true; $("#pageTitle").textContent = ""; $("#view").innerHTML = `<div class="authbox"><div class="ahead">${LOGO}</div></div>`; return; }
   if (!S.me){ nav.hidden = true; $("#status").innerHTML = ""; $("#pageTitle").textContent = S.authMode === "criar" ? "Criar conta" : "Entrar"; if (rendered !== "auth-"+S.authMode){ $("#view").innerHTML = viewAuth(); rendered = "auth-"+S.authMode; } return; }
   if (S.member === null){ nav.hidden = true; $("#pageTitle").textContent = ""; $("#view").innerHTML = `<div class="banner">Carregando…</div>`; rendered = ""; return; }
   if (S.member === false){ nav.hidden = true; $("#pageTitle").textContent = "Bem-vindo"; if (rendered !== "join"){ $("#view").innerHTML = viewJoin(); rendered = "join"; } return; }
@@ -474,6 +478,7 @@ document.addEventListener("submit", async e => {
     if (signup){ nick = $("#aNick").value.trim().slice(0,24); code = $("#aCode").value.trim().toUpperCase();
       if (!nick) return fail("Escolha um apelido."); if (!code) return fail("Coloque o código da liga."); }
     btn.disabled = true; m.className = "msg"; m.textContent = signup ? "Criando conta…" : "Entrando…";
+    rememberLogin($("#aLogin").value.trim());
     try {
       if (signup){
         S.signingUp = true;
@@ -528,7 +533,6 @@ document.addEventListener("submit", async e => {
 tickCountdown(); setInterval(tickCountdown, 30000);
 render();
 if (auth){
-  setPersistence(auth, browserLocalPersistence).catch(()=>{});
   onAuthStateChanged(auth, user => {
     S.authReady = true;
     if (S.signingUp && user) { S.me = user.uid; return; }

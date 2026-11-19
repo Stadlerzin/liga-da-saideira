@@ -413,3 +413,20 @@ footer.resp{color:#48484a}
 .rulelist b{font-family:var(--f-body)}
 @media (max-width:370px){.bigav{width:76px;height:76px;font-size:34px}.pstats b{font-size:17px}.pstats small{font-size:11px}}
 .liga tr.me td.name::after{content:none}
+/* tela de entrar / cadastrar */
+body.authmode header.top{display:none}
+body.authmode footer.resp{display:none}
+.authbox{min-height:calc(100vh - 40px);min-height:calc(100dvh - 40px);display:flex;flex-direction:column;justify-content:center;gap:22px;padding-block:24px;max-width:380px;margin:0 auto;width:100%}
+.ahead{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.alogo{width:84px;height:84px;border-radius:22px;margin-bottom:10px}
+.ahead h2{font-size:28px;margin:0}
+.ahead p{margin:0;color:var(--muted);font-size:15px}
+.aform{display:flex;flex-direction:column;gap:10px}
+.aform .field{font-size:16px;padding:15px 16px;border:1px solid #2c2c2e;background:#1c1c1e}
+.aform .field:focus{border-color:#636366;outline:none}
+.aform .btn.primary{margin-top:6px;padding:15px;width:100%}
+.aform .msg{text-align:center;min-height:1px}
+.alink{background:none;border:0;color:#fff;font-weight:600;font-size:14px;cursor:pointer;padding:6px;align-self:center}
+.aswitch{text-align:center;color:var(--muted);font-size:15px;padding-top:16px;border-top:1px solid var(--line-2)}
+.aswitch button{background:none;border:0;color:#fff;font-weight:700;font-size:15px;cursor:pointer;padding:4px}
+.afoot{text-align:center;color:#48484a;font-size:12px;margin:0;line-height:1.5}
