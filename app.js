@@ -225,7 +225,7 @@ function viewFeed(){
       <div class="post-f">
         ${!own ? `<button class="btn ${on?"on":""}" data-kudo="${esc(c.id)}" aria-pressed="${on}">Brindar${k?` · ${k}`:""}</button>` : `<span class="kc">${k?`${k} ${k===1?"brinde":"brindes"}`:""}</span>`}
         ${live?`<button class="btn" data-togglequick="${esc(c.id)}" aria-expanded="${openQuick.has(c.id)}">${openQuick.has(c.id)?"Fechar":"+ Somar"}</button>`:""}
-        ${own?`<button class="btn ghost" data-edit="${esc(c.id)}">Editar</button>`:""}
+        ${own?`<button class="btn ghost" data-edit="${esc(c.id)}">Editar</button><button class="btn ghost danger-sm" data-del="${esc(c.id)}">Apagar</button>`:""}
       </div>
     </article>`; }).join("")}</div>`;
 }
@@ -431,12 +431,12 @@ document.addEventListener("click", async e => {
   if (e.target.id === "cancelEdit"){ S.draft = freshDraft(); rendered = ""; render(); return; }
   const del = e.target.closest("[data-del]");
   if (del){
-    if (del.dataset.confirm !== "1"){ del.dataset.confirm = "1"; del.textContent = "Toque de novo para apagar"; setTimeout(()=>{ if(del.isConnected){ del.dataset.confirm=""; del.textContent="Apagar rolê"; } }, 4000); return; }
-    const id = del.dataset.del, c = S.checkins.find(x => x.id === id); del.disabled = true;
+    if (del.dataset.confirm !== "1"){ const orig = del.textContent; del.dataset.confirm = "1"; del.textContent = "Confirmar"; del.classList.add("armed"); setTimeout(()=>{ if(del.isConnected){ del.dataset.confirm=""; del.textContent=orig; del.classList.remove("armed"); } }, 4000); return; }
+    const id = del.dataset.del, c = S.checkins.find(x => x.id === id); if (!c || c.uid !== S.me) return; del.disabled = true;
     try {
       await deleteDoc(doc(db, "checkins", id));
       if (c?.photoId) deleteDoc(doc(db, "photos", c.photoId)).catch(()=>{});
-      S.draft = freshDraft(); location.hash = "#feed";
+      if (S.draft.editId === id){ S.draft = freshDraft(); location.hash = "#feed"; }
     } catch(err){ del.disabled = false; }
     return; }
   if (e.target.id === "saveNick"){

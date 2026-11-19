@@ -432,3 +432,6 @@ body.authmode footer.resp{display:none}
 .afoot{text-align:center;color:#48484a;font-size:12px;margin:0;line-height:1.5}
 
 .t-resenha{color:#fff}
+.post.clean .post-f .btn.ghost[data-edit]{margin-left:auto}
+.post.clean .post-f .btn.danger-sm{margin-left:0;color:var(--bad)}
+.btn.armed{background:var(--bad)!important;color:#fff!important}
