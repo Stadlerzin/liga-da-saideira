@@ -1,0 +1,53 @@
+rules_version = '2';
+// Regras da Liga da Saideira.
+// Troque VIRADA2027 pelo código da sua liga (o mesmo que você passa para os amigos).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMember() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function validCounts(n) {
+      return n is map && n.keys().hasOnly(['cerveja','destilado','shot','beijos','tocos','transa']);
+    }
+
+    match /users/{uid} {
+      allow read: if isMember();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.invite == 'VIRADA2027'
+        && request.resource.data.nick is string && request.resource.data.nick.size() > 0 && request.resource.data.nick.size() <= 24;
+      allow update: if request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nick'])
+        && request.resource.data.nick is string && request.resource.data.nick.size() > 0 && request.resource.data.nick.size() <= 24;
+      allow delete: if false;
+    }
+
+    match /checkins/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.type in ['bar','festa']
+        && validCounts(request.resource.data.n)
+        && request.resource.data.kudos == [];
+      // Dono edita tudo (menos o dono e os brindes); os outros só podem pôr ou tirar o próprio brinde.
+      allow update: if isMember() && (
+        (resource.data.uid == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.type in ['bar','festa']
+          && validCounts(request.resource.data.n)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['kudos']))
+        ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kudos'])
+          && request.resource.data.kudos.toSet().difference(resource.data.kudos.toSet())
+               .union(resource.data.kudos.toSet().difference(request.resource.data.kudos.toSet()))
+               .hasOnly([request.auth.uid]))
+      );
+      allow delete: if isMember() && resource.data.uid == request.auth.uid;
+    }
+
+    match /photos/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.data is string && request.resource.data.data.size() < 900000;
+      allow delete: if isMember() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}
