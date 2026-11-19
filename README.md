@@ -5,7 +5,7 @@ Liga de rolês entre amigos até a virada: check-in com foto, feed com brindes, 
 Site estático (HTML + JS) que usa o Firebase para login (e-mail ou celular + senha) e banco de dados (Firestore). As fotos ficam comprimidas no próprio Firestore, então tudo funciona no plano gratuito.
 
 ## Pontuação
-Bar 5 · Festa 10 · Cerveja 1 · Copo de destilado 2 · Shot 3 · Beijo 3 · Toco 1 · Transa 8 · PT −5.
+Bar 5 · Festa 10 · Resenha 0 · Cerveja 1 · Copo de destilado 2 · Shot 3 · Beijo 3 · Toco 1 · Transa 8 · PT −5.
 Desempate: pontos, saídas (V), beijos menos tocos (SG).
 
 ## Configuração

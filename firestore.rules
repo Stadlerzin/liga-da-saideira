@@ -23,14 +23,14 @@ service cloud.firestore {
     match /checkins/{id} {
       allow read: if isMember();
       allow create: if isMember() && request.resource.data.uid == request.auth.uid
-        && request.resource.data.type in ['bar','festa']
+        && request.resource.data.type in ['bar','festa','resenha']
         && validCounts(request.resource.data.n)
         && request.resource.data.kudos == [];
       // Dono edita tudo (menos o dono e os brindes); os outros só podem pôr ou tirar o próprio brinde.
       allow update: if isMember() && (
         (resource.data.uid == request.auth.uid
           && request.resource.data.uid == resource.data.uid
-          && request.resource.data.type in ['bar','festa']
+          && request.resource.data.type in ['bar','festa','resenha']
           && validCounts(request.resource.data.n)
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['kudos']))
         ||

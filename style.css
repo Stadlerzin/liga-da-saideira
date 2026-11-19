@@ -430,3 +430,5 @@ body.authmode footer.resp{display:none}
 .aswitch{text-align:center;color:var(--muted);font-size:15px;padding-top:16px;border-top:1px solid var(--line-2)}
 .aswitch button{background:none;border:0;color:#fff;font-weight:700;font-size:15px;cursor:pointer;padding:4px}
 .afoot{text-align:center;color:#48484a;font-size:12px;margin:0;line-height:1.5}
+
+.t-resenha{color:#fff}

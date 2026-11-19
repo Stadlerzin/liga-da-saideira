@@ -13,6 +13,7 @@ import { firebaseConfig } from "./config.js";
 const TYPES = {
   bar:   { label: "Bar",   pts: 5,  cls: "t-bar" },
   festa: { label: "Festa", pts: 10, cls: "t-festa" },
+  resenha: { label: "Resenha", pts: 0, cls: "t-resenha" },
 };
 const DRINKS = [
   { k: "cerveja",   label: "Cerveja",           pts: 1, one: "cerveja",   many: "cervejas" },
@@ -82,9 +83,9 @@ function ciCalc(c){
 function weekStart(){ const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - (d.getDay()+6)%7); return d.getTime(); }
 function playerStats(uid, since = 0){
   const cs = S.checkins.filter(c => c.uid === uid && c.ts >= since);
-  const st = { V: cs.length, P: 0, doses: 0, beijos: 0, tocos: 0, transa: 0, pt: 0, bar: 0, festa: 0, cerveja: 0, destilado: 0, shot: 0 };
+  const st = { V: cs.length, P: 0, doses: 0, beijos: 0, tocos: 0, transa: 0, pt: 0, bar: 0, festa: 0, resenha: 0, cerveja: 0, destilado: 0, shot: 0 };
   for (const c of cs){ const r = ciCalc(c); st.P += r.total; st.doses += r.doses; st.beijos += r.beijos; st.tocos += r.tocos; st.transa += r.transa;
-    if (c.pt) st.pt++; if (c.type === "bar") st.bar++; else st.festa++;
+    if (c.pt) st.pt++; if (c.type === "bar") st.bar++; else if (c.type === "resenha") st.resenha++; else st.festa++;
     for (const d of DRINKS) st[d.k] += num(c.n?.[d.k]); }
   st.SG = st.beijos - st.tocos;
   return st;
@@ -242,8 +243,8 @@ function viewCheckin(){
   return `<form class="ci" id="ciForm" novalidate>
     ${d.editId?`<div class="editbar"><span class="eyebrow">Editando rolê</span><button type="button" class="btn ghost" id="cancelEdit">Cancelar</button></div>`:""}
     <label class="drop" for="photo">${shown?`<img src="${shown}" alt="Prévia da foto">`:`<b>+ Foto</b><span>obrigatória</span>`}<input type="file" id="photo" accept="image/*"></label>
-    <div class="typepick" style="grid-template-columns:repeat(2,1fr)">
-      ${Object.entries(TYPES).map(([k,t]) => `<label class="${t.cls}"><input type="radio" name="type" id="type-${k}" value="${k}" ${d.type===k?"checked":""}><b>${t.label}</b><small>${t.pts} pts</small></label>`).join("")}
+    <div class="typepick" style="grid-template-columns:repeat(3,1fr)">
+      ${Object.entries(TYPES).map(([k,t]) => `<label class="${t.cls}"><input type="radio" name="type" id="type-${k}" value="${k}" ${d.type===k?"checked":""}><b>${t.label}</b><small>${t.pts ? t.pts + " pts" : "0 pts"}</small></label>`).join("")}
     </div>
     <input class="field" id="place" maxlength="60" placeholder="Onde?" aria-label="Onde" value="${esc(d.place)}">
     <div class="steppers">${ALL.map(x => stepper(x, num(d.n[x.k]))).join("")}</div>
@@ -299,7 +300,7 @@ function viewPerfil(uid){
   } else if (tab === "stats"){
     const line = (l, v) => `<li><span>${l}</span><b>${v}</b></li>`;
     body = `<ul class="statlist">
-      ${line("Pontos", st.P)}${line("Posição", pos ? pos + "º" : "–")}${line("Bares", st.bar)}${line("Festas", st.festa)}
+      ${line("Pontos", st.P)}${line("Posição", pos ? pos + "º" : "–")}${line("Bares", st.bar)}${line("Festas", st.festa)}${line("Resenhas", st.resenha)}
       ${line("Cervejas", st.cerveja)}${line("Copos de destilado", st.destilado)}${line("Shots", st.shot)}
       ${line("Beijos", st.beijos)}${line("Tocos", st.tocos)}${line("Transas", st.transa)}${line("PTs", st.pt)}
     </ul>`;
@@ -329,7 +330,7 @@ function viewPerfil(uid){
     ${mine && panel === "edit" ? `<div class="ppanel"><label class="lbl" for="nick">Apelido</label><div class="join"><input class="field" id="nick" maxlength="24" value="${esc(u.nick||"")}"><button class="btn primary" id="saveNick" type="button">Salvar</button></div><div id="nickMsg" class="msg" role="status"></div>
       <div class="acct"><span class="kc">${esc(loginLabel())}</span><button class="btn ghost" data-logout>Sair</button></div></div>` : ""}
     ${panel === "rules" ? `<div class="ppanel"><ul class="rulelist">
-      <li><span>Bar</span><b>5</b></li><li><span>Festa</span><b>10</b></li>
+      <li><span>Bar</span><b>5</b></li><li><span>Festa</span><b>10</b></li><li><span>Resenha</span><b>0</b></li>
       <li><span>Cerveja</span><b>1</b></li><li><span>Destilado</span><b>2</b></li><li><span>Shot</span><b>3</b></li>
       <li><span>Beijo</span><b>3</b></li><li><span>Toco</span><b>1</b></li><li><span>Transa</span><b>8</b></li><li><span>PT</span><b>−5</b></li>
     </ul><p class="sub" style="margin:8px 0 0">Desempate: pontos, saídas (V), beijos menos tocos (SG).</p></div>` : ""}
