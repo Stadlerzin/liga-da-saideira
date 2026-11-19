@@ -242,7 +242,7 @@ function viewCheckin(){
   const shown = d.photoData || (d.photoId ? photoSrc(d.photoId) : "");
   return `<form class="ci" id="ciForm" novalidate>
     ${d.editId?`<div class="editbar"><span class="eyebrow">Editando rolê</span><button type="button" class="btn ghost" id="cancelEdit">Cancelar</button></div>`:""}
-    <label class="drop" for="photo">${shown?`<img src="${shown}" alt="Prévia da foto">`:`<b>+ Foto</b><span>obrigatória</span>`}<input type="file" id="photo" accept="image/*"></label>
+    <button type="button" class="drop" data-opencam aria-label="Abrir câmera">${shown?`<img src="${shown}" alt="Prévia da foto">`:`<b>+ Foto</b><span>toque para abrir a câmera</span>`}</button><input type="file" id="photo" accept="image/*" hidden>
     <div class="typepick" style="grid-template-columns:repeat(3,1fr)">
       ${Object.entries(TYPES).map(([k,t]) => `<label class="${t.cls}"><input type="radio" name="type" id="type-${k}" value="${k}" ${d.type===k?"checked":""}><b>${t.label}</b><small>${t.pts ? t.pts + " pts" : "0 pts"}</small></label>`).join("")}
     </div>
@@ -398,8 +398,84 @@ async function checkMember(uid){
   rendered = ""; render();
 }
 
+
+/* ---------- Câmera (estilo WhatsApp) ---------- */
+const CAM = { stream: null, facing: "environment" };
+const CAM_ICONS = {
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  gallery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="15.5" cy="9.5" r="1.8"/><path d="m3.5 17 5.5-5.5 4.5 4.5 2.5-2.5 4.5 4.5"/></svg>',
+  flip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>',
+};
+async function setPhoto(fileOrBlob){
+  const d = S.draft, m = $("#ciMsg");
+  try {
+    d.photoData = await shrinkToDataUrl(fileOrBlob);
+    const drop = document.querySelector(".drop");
+    if (drop){ drop.querySelectorAll("b,span,img").forEach(n => n.remove());
+      const img = document.createElement("img"); img.src = d.photoData; img.alt = "Prévia da foto"; drop.prepend(img); }
+    if (m){ m.className = "msg"; m.textContent = ""; }
+  } catch(err){ if (m){ m.className = "msg err"; m.textContent = "Não consegui abrir essa imagem. Tente outra foto."; } }
+}
+async function openCamera(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ $("#photo")?.click(); return; }
+  closeCamera();
+  const ov = document.createElement("div");
+  ov.className = "camera"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-label", "Câmera");
+  ov.innerHTML = `<video playsinline autoplay muted></video><div class="cam-flash"></div>
+    <button type="button" class="cam-btn cam-x" data-cam="close" aria-label="Fechar câmera">${CAM_ICONS.x}</button>
+    <div class="cam-msg" role="status"></div>
+    <div class="cam-bar">
+      <button type="button" class="cam-btn" data-cam="gallery" aria-label="Escolher da galeria">${CAM_ICONS.gallery}</button>
+      <button type="button" class="cam-shot" data-cam="shot" aria-label="Tirar foto"></button>
+      <button type="button" class="cam-btn" data-cam="flip" aria-label="Virar câmera">${CAM_ICONS.flip}</button>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.classList.add("cam-open");
+  await startStream();
+}
+async function startStream(){
+  const ov = document.querySelector(".camera"); if (!ov) return;
+  const v = ov.querySelector("video"), msg = ov.querySelector(".cam-msg");
+  if (CAM.stream){ CAM.stream.getTracks().forEach(t => t.stop()); CAM.stream = null; }
+  msg.textContent = "";
+  try {
+    CAM.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: CAM.facing, width: { ideal: 1920 }, height: { ideal: 1920 } } });
+    if (!document.querySelector(".camera")){ CAM.stream.getTracks().forEach(t => t.stop()); CAM.stream = null; return; }
+    v.srcObject = CAM.stream;
+    v.classList.toggle("mirror", CAM.facing === "user");
+    await v.play().catch(()=>{});
+  } catch(e){
+    msg.textContent = "Sem acesso à câmera. Libere a câmera para este site nos Ajustes ou escolha uma foto da galeria.";
+  }
+}
+function closeCamera(){
+  if (CAM.stream){ CAM.stream.getTracks().forEach(t => t.stop()); CAM.stream = null; }
+  document.querySelector(".camera")?.remove();
+  document.body.classList.remove("cam-open");
+}
+function takeShot(){
+  const ov = document.querySelector(".camera"); if (!ov) return;
+  const v = ov.querySelector("video");
+  if (!v.videoWidth) return;
+  const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+  const x = c.getContext("2d");
+  if (CAM.facing === "user"){ x.translate(c.width, 0); x.scale(-1, 1); } // selfie espelhada, como aparece na tela
+  x.drawImage(v, 0, 0, c.width, c.height);
+  ov.querySelector(".cam-flash").classList.add("on");
+  c.toBlob(async b => { closeCamera(); if (b) await setPhoto(b); }, "image/jpeg", 0.9);
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.querySelector(".camera")) closeCamera(); });
+
 /* ---------- Eventos ---------- */
 document.addEventListener("click", async e => {
+  const camBtn = e.target.closest("[data-cam]");
+  if (camBtn){ const a = camBtn.dataset.cam;
+    if (a === "close") closeCamera();
+    else if (a === "shot") takeShot();
+    else if (a === "flip"){ CAM.facing = CAM.facing === "user" ? "environment" : "user"; startStream(); }
+    else if (a === "gallery") $("#photo")?.click();
+    return; }
+  if (e.target.closest("[data-opencam]")){ openCamera(); return; }
   const am = e.target.closest("[data-authmode]"); if (am){ S.authMode = am.dataset.authmode; rendered = ""; render(); return; }
   if (e.target.closest("[data-logout]")){ stopData(); S.authMode = "entrar"; S.member = null; S.joinErr = ""; await signOut(auth); return; }
   if (e.target.id === "forgot"){
@@ -447,16 +523,7 @@ document.addEventListener("click", async e => {
 });
 document.addEventListener("change", async e => {
   const t = e.target, d = S.draft;
-  if (t.id === "photo" && t.files && t.files[0]){
-    const m = $("#ciMsg");
-    try {
-      d.photoData = await shrinkToDataUrl(t.files[0]);
-      const drop = document.querySelector("label.drop");
-      drop.querySelectorAll("b,span,img").forEach(n => n.remove());
-      const img = document.createElement("img"); img.src = d.photoData; img.alt = "Prévia da foto"; drop.prepend(img);
-      if (m){ m.className = "msg"; m.textContent = ""; }
-    } catch(err){ if (m){ m.className = "msg err"; m.textContent = "Não consegui abrir essa imagem. Tente outra foto."; } }
-  }
+  if (t.id === "photo" && t.files && t.files[0]){ closeCamera(); await setPhoto(t.files[0]); t.value = ""; }
   if (t.id === "pt"){ d.pt = t.checked; refreshPreview(); }
 });
 document.addEventListener("input", e => {
